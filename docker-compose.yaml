@@ -14,19 +14,16 @@ services:
         volumes:
           - /home/dima/docker-mounts/mariadb:/var/lib/mysql
           
-    minidlna:
-        restart: unless-stopped
-        hostname: miniDlna
-        container_name: miniDlna
-        image: geekduck/minidlna
-        volumes:
-          - /media/dima/RouterHDD/Movies:/opt/Videos
-          - pictures:/opt/Pictures
-          - music:/opt/Music
-        network_mode: "host"
-        ports:
-          - 8200:8200
-          - 1900:1900/udp
+    rygel:
+      restart: unless-stopped
+      hostname: rygelDlna
+      container_name: rygelDlna
+      image: linuxconfig/rygel:latest
+      network_mode: "host"
+      volumes:
+        - /media/dima/RouterHDD/Movies:/video
+        - pictures:/pictures
+        - music:/music
 
     mqtt:
         restart: unless-stopped
