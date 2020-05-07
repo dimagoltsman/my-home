@@ -20,11 +20,13 @@ services:
       container_name: rygelDlna
       image: linuxconfig/rygel:latest
       network_mode: "host"
+      command: /usr/bin/rygel --config /etc/rygel.conf
       volumes:
         - /media/dima/RouterHDD/Movies:/video
         - pictures:/pictures
         - music:/music
-
+        - /home/dima/docker-mounts/rygel/rygel.conf:/etc/rygel.conf #optional
+        
     mqtt:
         restart: unless-stopped
         hostname: mqtt
