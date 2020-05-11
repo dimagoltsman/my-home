@@ -1,4 +1,4 @@
-version: '2'
+version: '3.8'
 services:
     mariadb:
         restart: unless-stopped
@@ -7,26 +7,34 @@ services:
         image: mariadb:latest
         environment:
           TZ: "Asia/Jerusalem"
-          MYSQL_ROOT_PASSWORD: MY_PASSWORD
+          MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
           MYSQL_ROOT_HOST: "%"
         ports:
           - "3306:3306"
         volumes:
           - /home/dima/docker-mounts/mariadb:/var/lib/mysql
-          
+      
+      
     rygel:
       restart: unless-stopped
       hostname: rygelDlna
       container_name: rygelDlna
       image: linuxconfig/rygel:latest
-      network_mode: "host"
       command: /usr/bin/rygel --config /etc/rygel.conf
+      network_mode: host
+      depends_on: 
+        - mariadb
+        - mqtt
+        - nginx
+        - transmission
+        - portainer
       volumes:
         - /media/dima/RouterHDD/Movies:/video
         - pictures:/pictures
         - music:/music
         - /home/dima/docker-mounts/rygel/rygel.conf:/etc/rygel.conf #optional
         
+  
     mqtt:
         restart: unless-stopped
         hostname: mqtt
@@ -34,8 +42,8 @@ services:
         image: eclipse-mosquitto:latest
         environment:
           TZ: "Asia/Jerusalem"
-          USER: "MY_USER"
-          PASS: "MY_PASS"
+          USER: ${MQTT_USER}
+          PASS: ${MQTT_PASS}
         volumes:
           - /home/dima/docker-mounts/mqtt/data:/mosquitto/data
           - /home/dima/docker-mounts/mqtt/config:/mosquitto/config
@@ -52,8 +60,8 @@ services:
         image: linuxserver/transmission:latest
         environment:
           TZ: "Asia/Jerusalem"
-          USER: "MY_USER"
-          PASS: "MY_PASS"
+          USER: ${TRANSMISSION_USER}
+          PASS: ${TRANSMISSION_PASS}
         volumes:
           - /media/dima/RouterHDD/Movies:/downloads
           - /home/dima/docker-mounts/transmission:/config
@@ -79,12 +87,13 @@ services:
         depends_on: 
           - mariadb
           - mqtt
+          - nginx
         labels:
           com.ouroboros.enable: "false"
         environment:
           TZ: "Asia/Jerusalem"
-          USER: "MY_USER"
-          PASS: "MY_PASS"
+          USER: ${HA_USER}
+          PASS: ${HA_PASS}
         volumes:
           - /home/dima/docker-mounts/ha:/config
         network_mode: "host"
@@ -110,13 +119,15 @@ services:
         image: mauler/simple-ftp-server
         environment:
           TZ: "Asia/Jerusalem"
-          FTP_USER: "MY_USER"
-          FTP_PASS: "MY_PASS"
+          FTP_USER: ${FTP_USER}
+          FTP_PASS: ${FTP_PASS}
+        mac_address: 00:00:ff:ff:ff:01
         volumes:
           - /media/dima/RouterHDD/ftp:/ftp-home
-        network_mode: "bridge"
+        # network_mode: "router"
         ports:
           - "11021:21"
+    
 
     nginx: 
       restart: unless-stopped
@@ -139,7 +150,7 @@ services:
         - /var/run/docker.sock:/var/run/docker.sock
       environment:
         - TZ=Asia/Jerusalem
-        - NOTIFIERS=tgram://TelegramId/chatId
+        - "NOTIFIERS=${TELEGRAM_NOTIF}"
         - CLEANUP=true
         - INTERVAL=300
         - LOG_LEVEL=info
@@ -147,7 +158,7 @@ services:
         - LABEL_ENABLE=true
         - LATEST=true
       restart: unless-stopped
-      
+    
     samba:
       image: sixeyed/samba
       container_name: samba
@@ -184,7 +195,7 @@ services:
       depends_on: 
         - nginx
       environment:
-        CERTBOT_EMAIL: my@email.com
+        CERTBOT_EMAIL: ${CERTBOT_EMAIL}
       volumes:
         - /home/dima/docker-mounts/certbot/www:/var/www/certbot
         - /home/dima/docker-mounts/certbot/etc/letsencrypt:/etc/letsencrypt
@@ -198,7 +209,7 @@ services:
         - PUID=1000 #optional
         - PGID=1000 #optional
         - SUBDOMAINS=goltsman #,sub2,sub3
-        - TOKEN="duck-dns-secret-token-string"
+        - "TOKEN=${DUCKDNS_TOKEN}"
         - LOG_FILE=false #optional
         - TZ=Asia/Jerusalem
       restart: unless-stopped
@@ -214,6 +225,7 @@ services:
       ports:
         - 63080:8080
       network_mode: "bridge"
+      restart: unless-stopped
       volumes:
       - /home/dima/docker-mounts/gosdm/mbmd.yaml:/etc/mbmd.yaml
       
@@ -227,8 +239,10 @@ services:
       ports:
         - "6052:6052"
       
+
     pihole:
       container_name: pihole
+      hostname: pihole
       image: pihole/pihole:latest
       ports:
         - "53:53/tcp"
@@ -238,7 +252,7 @@ services:
         - "10443:443/tcp"
       environment:
         TZ: 'Asia/Jerusalem'
-        WEBPASSWORD: 'WEB_PASSWORD'
+        WEBPASSWORD: ${PIHOLE_PASS}
       volumes:
         - '/home/dima/docker-mounts/pihole/etc-pihole/:/etc/pihole/'
         - '/home/dima/docker-mounts/pihole/etc-hosts:/etc/hosts'
@@ -250,6 +264,27 @@ services:
         - NET_ADMIN
       restart: unless-stopped
      
+    adbserver:
+      image: sorccu/adb
+      hostname: adb
+      container_name: adb
+      restart: unless-stopped
+      command: sh -c "/root/.android/startup.sh & adb -a -P 5037 server nodaemon"
+      network_mode: "host"
+      volumes:
+        - /home/dima/docker-mounts/adbserver:/root/.android
+        - /etc/timezone:/etc/timezone:ro
+        - /etc/localtime:/etc/localtime:ro
+      environment:
+        - PUID=1000
+        - TZ=Asia/Jerusalem
+        - LOG_LEVEL="info"
+        - KEYS_PATH="./root"
+      ports:
+        - "5037:5037"
+     
+   
+    
 volumes:
   pictures:
   music:
