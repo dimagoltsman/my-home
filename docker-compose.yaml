@@ -1,11 +1,13 @@
 version: '3.8'
 services:
     mariadb:
-        restart: unless-stopped
+        restart: always
         hostname: mariadb
         container_name: mariadb
         image: mariadb:latest
         environment:
+          PUID: 0
+          PGID: 0
           TZ: "Asia/Jerusalem"
           MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
           MYSQL_ROOT_HOST: "%"
@@ -15,28 +17,24 @@ services:
           - /home/dima/docker-mounts/mariadb:/var/lib/mysql
       
       
-    rygel:
-      restart: unless-stopped
-      hostname: rygelDlna
-      container_name: rygelDlna
-      image: linuxconfig/rygel:latest
-      command: /usr/bin/rygel --config /etc/rygel.conf
-      network_mode: host
-      depends_on: 
-        - mariadb
-        - mqtt
-        - nginx
-        - transmission
-        - portainer
+    minidlna:
+      hostname: miniDlna
+      container_name: miniDlna
+      image: vladgh/minidlna
       volumes:
-        - /media/dima/RouterHDD/Movies:/video
-        - pictures:/pictures
-        - music:/music
-        - /home/dima/docker-mounts/rygel/rygel.conf:/etc/rygel.conf #optional
-        
+        -  /media/dima/RouterHDD/Movies:/media
+      environment:
+        - MINIDLNA_FRIENDLY_NAME=MiniDlna
+        - MINIDLNA_PORT=8200
+        - MINIDLNA_MEDIA_DIR=/media
+      ports:
+        - 8200:8200
+      network_mode: "host"
+      restart: always
+  
   
     mqtt:
-        restart: unless-stopped
+        restart: always
         hostname: mqtt
         container_name: MQTT
         image: eclipse-mosquitto:latest
@@ -54,7 +52,7 @@ services:
           - "9001:9001"
 
     transmission:
-        restart: unless-stopped
+        restart: always
         hostname: Transmission
         container_name: Transmission
         image: linuxserver/transmission:latest
@@ -68,19 +66,24 @@ services:
         network_mode: "host"
 
     cloud9:
-        restart: unless-stopped
+        restart: always
         hostname: cloud9
         container_name: cloud9
         image: linuxserver/cloud9:latest
         environment:
+          PUID: 0
+          PGID: 0
           TZ: "Asia/Jerusalem"
         volumes:
           - /home/dima/docker-mounts:/code
           - /var/run/docker.sock:/var/run/docker.sock
-        network_mode: "host"
+        network_mode: "bridge"
+        ports:
+          - "8000:8000"
+
 
     homeassistant:
-        restart: unless-stopped
+        restart: always
         hostname: homeassistant
         container_name: Home-Assistant
         image: homeassistant/home-assistant:stable
@@ -99,7 +102,7 @@ services:
         network_mode: "host"
 
     portainer:
-        restart: unless-stopped
+        restart: always
         hostname: portainer
         container_name: Portrainer
         image: portainer/portainer
@@ -113,7 +116,7 @@ services:
           - "9000:9000"
 
     ftpserver:
-        restart: unless-stopped
+        restart: always
         hostname: ftp-server
         container_name: ftp-server
         image: mauler/simple-ftp-server
@@ -124,13 +127,12 @@ services:
         mac_address: 00:00:ff:ff:ff:01
         volumes:
           - /media/dima/RouterHDD/ftp:/ftp-home
-        # network_mode: "router"
         ports:
           - "11021:21"
     
 
     nginx: 
-      restart: unless-stopped
+      restart: always
       image: nginx:latest
       container_name: nginx
       privileged: true
@@ -157,12 +159,12 @@ services:
         - SELF_UPDATE=true
         - LABEL_ENABLE=true
         - LATEST=true
-      restart: unless-stopped
+      restart: always
     
     samba:
       image: sixeyed/samba
       container_name: samba
-      restart: unless-stopped
+      restart: always
       environment:
         BRIDGE: php-local
       command: samba.sh -s "all;/mnt/RouterHDD;yes;no;yes;all" 
@@ -186,11 +188,11 @@ services:
       ports:
         - 880:80
         - 8443:443
-      restart: unless-stopped
+      restart: always
       
     certbot:
       container_name: certbotgo
-      restart: unless-stopped
+      restart: always
       image: certbot/certbot
       depends_on: 
         - nginx
@@ -199,7 +201,7 @@ services:
       volumes:
         - /home/dima/docker-mounts/certbot/www:/var/www/certbot
         - /home/dima/docker-mounts/certbot/etc/letsencrypt:/etc/letsencrypt
-      entrypoint: "/bin/sh -c 'trap exit TERM; while :; do certbot renew; sleep 12h & wait $${!}; done;'"
+      entrypoint: "/bin/sh -c 'trap exit TERM; while :; do certbot renew --webroot -w /var/www/certbot; sleep 12h & wait $${!}; done;'"
      
      
     duckdns:
@@ -208,11 +210,11 @@ services:
       environment:
         - PUID=1000 #optional
         - PGID=1000 #optional
-        - SUBDOMAINS=goltsman #,sub2,sub3
+        - SUBDOMAINS=${DUCKDNS_SUBDOMAIN} #,sub2,sub3
         - "TOKEN=${DUCKDNS_TOKEN}"
         - LOG_FILE=false #optional
         - TZ=Asia/Jerusalem
-      restart: unless-stopped
+      restart: always
       
     gosdm:
       image: volkszaehler/mbmd
@@ -225,7 +227,7 @@ services:
       ports:
         - 63080:8080
       network_mode: "bridge"
-      restart: unless-stopped
+      restart: always
       volumes:
       - /home/dima/docker-mounts/gosdm/mbmd.yaml:/etc/mbmd.yaml
       
@@ -235,7 +237,7 @@ services:
       volumes:
         - /home/dima/docker-mounts/esphome:/config:rw
       network_mode: host
-      restart: unless-stopped
+      restart: always
       ports:
         - "6052:6052"
       
@@ -262,13 +264,13 @@ services:
         - 9.9.9.9
       cap_add:
         - NET_ADMIN
-      restart: unless-stopped
+      restart: always
      
     adbserver:
       image: sorccu/adb
       hostname: adb
       container_name: adb
-      restart: unless-stopped
+      restart: always
       command: sh -c "/root/.android/startup.sh & adb -a -P 5037 server nodaemon"
       network_mode: "host"
       volumes:
@@ -282,9 +284,38 @@ services:
         - KEYS_PATH="./root"
       ports:
         - "5037:5037"
-     
-   
+        
+    broadlinkmanager:
+      container_name: broadlinkmanager
+      image: techblog/broadlinkmanager
+      network_mode: host
+      container_name: broadlinkmanager
+      restart: always
+    
+    phpmyadmin:
+     image: phpmyadmin/phpmyadmin
+     container_name: phpmyadmin
+     environment:
+      - PMA_ARBITRARY=1
+      - MYSQL_ROOT_PASSWORD=${MYSQL_ROOT_PASSWORD}
+     restart: always
+     ports:
+      - 8080:80
+     volumes:
+      - /sessions
+      
+    motioneye:
+      image: ccrisan/motioneye:master-amd64
+      container_name: motioneye
+      ports:
+        - 8765:8765
+      hostname: motioneye
+      restart: always
+      volumes:
+       - /etc/localtime:/etc/localtime:ro
+       - /home/dima/docker-mounts/motioneye:/etc/motioneye
+       - /home/dima/docker-mounts/motioneye:/var/lib/motioneye
+      
     
 volumes:
-  pictures:
-  music:
+  sessions:
