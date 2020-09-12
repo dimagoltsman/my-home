@@ -17,20 +17,20 @@ services:
           - /home/dima/docker-mounts/mariadb:/var/lib/mysql
       
       
-    minidlna:
-      hostname: miniDlna
-      container_name: miniDlna
-      image: vladgh/minidlna
-      volumes:
-        -  /media/dima/RouterHDD/Movies:/media
-      environment:
-        - MINIDLNA_FRIENDLY_NAME=MiniDlna
-        - MINIDLNA_PORT=8200
-        - MINIDLNA_MEDIA_DIR=/media
-      ports:
-        - 8200:8200
-      network_mode: "host"
-      restart: always
+  #  minidlna:
+  #    hostname: miniDlna
+  #    container_name: miniDlna
+  #    image: vladgh/minidlna
+  #    volumes:
+  #      -  /media/dima/RouterHDD/Movies:/media
+  #    environment:
+  #      - MINIDLNA_FRIENDLY_NAME=MiniDlna
+  #      - MINIDLNA_PORT=8200
+  #      - MINIDLNA_MEDIA_DIR=/media
+  #    ports:
+  #      - 8200:8200
+  #    network_mode: "host"
+  #    restart: always
   
   
     mqtt:
@@ -76,6 +76,7 @@ services:
           TZ: "Asia/Jerusalem"
         volumes:
           - /home/dima/docker-mounts:/code
+          - /home/dima/platesMigration:/code/platesMigration
           - /var/run/docker.sock:/var/run/docker.sock
         network_mode: "bridge"
         ports:
@@ -105,7 +106,7 @@ services:
         restart: always
         hostname: portainer
         container_name: Portrainer
-        image: portainer/portainer
+        image: portainer/portainer-ce
         environment:
           TZ: "Asia/Jerusalem"
         volumes:
@@ -143,6 +144,7 @@ services:
         - /home/dima/docker-mounts/nginx/etc/nginx:/etc/nginx
         - /home/dima/docker-mounts/certbot/etc/letsencrypt:/etc/letsencrypt
         - /home/dima/docker-mounts/certbot/www:/var/www/certbot
+        - /media/dima/RouterHDD/ftp:/ftp
       network_mode: "host"
 
     ouroboros:
@@ -154,11 +156,11 @@ services:
         - TZ=Asia/Jerusalem
         - "NOTIFIERS=${TELEGRAM_NOTIF}"
         - CLEANUP=true
-        - INTERVAL=300
         - LOG_LEVEL=info
         - SELF_UPDATE=true
         - LABEL_ENABLE=true
         - LATEST=true
+        - CRON="0 6 * * *"
       restart: always
     
     samba:
@@ -210,7 +212,7 @@ services:
       environment:
         - PUID=1000 #optional
         - PGID=1000 #optional
-        - SUBDOMAINS=${DUCKDNS_SUBDOMAIN} #,sub2,sub3
+        - "SUBDOMAINS=${DUCKDNS_SUBDOMAIN}" #,sub2,sub3
         - "TOKEN=${DUCKDNS_TOKEN}"
         - LOG_FILE=false #optional
         - TZ=Asia/Jerusalem
@@ -220,6 +222,9 @@ services:
       image: volkszaehler/mbmd
       container_name: gosdm
       command: run -c /etc/mbmd.yaml
+      cap_add:
+        - SYS_ADMIN
+      user: root
       depends_on:
         - mqtt
       devices:
@@ -259,6 +264,7 @@ services:
         - '/home/dima/docker-mounts/pihole/etc-pihole/:/etc/pihole/'
         - '/home/dima/docker-mounts/pihole/etc-hosts:/etc/hosts'
         - '/home/dima/docker-mounts/pihole/etc-dnsmasq.d/:/etc/dnsmasq.d/'
+        - '/home/dima/docker-mounts/pihole/pihole.log:/var/log/pihole.log'
       dns:
         - 127.0.0.1
         - 9.9.9.9
@@ -315,7 +321,46 @@ services:
        - /etc/localtime:/etc/localtime:ro
        - /home/dima/docker-mounts/motioneye:/etc/motioneye
        - /home/dima/docker-mounts/motioneye:/var/lib/motioneye
-      
     
+    jellyfin:
+        hostname: jellyfin
+        container_name: jellyfin
+        image: jellyfin/jellyfin
+        privileged: true
+        network_mode: "host"
+        restart: "unless-stopped"
+        environment:
+            TZ: "Asia/Jerusalem"
+        devices:
+          - /dev/dri:/dev/dri
+        volumes:
+          - /home/dima/docker-mounts/jellyfin/config:/config
+          - /home/dima/docker-mounts/jellyfin/cache:/cache
+          - /media/dima/RouterHDD/Movies:/video
+          
+        
+    # glances:
+    #   image: vimagick/glances
+    #   container_name: glances
+    #   volumes:
+    #     - /home/dima/docker-mounts/glances:/etc/glances
+    #     - /var/run/docker.sock:/var/run/docker.sock:ro
+    #   environment:
+    #     - GLANCES_OPT=-w
+    #   network_mode: host
+    #   pid: host
+    #   restart: always
+    
+    
+    havid-19:
+      image: techblog/havid-19
+      container_name: havid-19
+      restart: always
+      environment:
+        - USER_ID=5217038
+        - USER_KEY=${PARENTS_PASS}
+      ports:
+        - "6700:6700"
+      
 volumes:
   sessions:
