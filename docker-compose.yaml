@@ -1,12 +1,13 @@
 version: '3.8'
 services:
+
     mariadb:
         restart: always
         hostname: mariadb
         container_name: mariadb
         image: mariadb:latest
         environment:
-          PUID: 0
+          PUID: 0f
           PGID: 0
           TZ: "Asia/Jerusalem"
           MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
@@ -15,23 +16,6 @@ services:
           - "3306:3306"
         volumes:
           - /home/dima/docker-mounts/mariadb:/var/lib/mysql
-      
-      
-  #  minidlna:
-  #    hostname: miniDlna
-  #    container_name: miniDlna
-  #    image: vladgh/minidlna
-  #    volumes:
-  #      -  /media/dima/RouterHDD/Movies:/media
-  #    environment:
-  #      - MINIDLNA_FRIENDLY_NAME=MiniDlna
-  #      - MINIDLNA_PORT=8200
-  #      - MINIDLNA_MEDIA_DIR=/media
-  #    ports:
-  #      - 8200:8200
-  #    network_mode: "host"
-  #    restart: always
-  
   
     mqtt:
         restart: always
@@ -81,6 +65,20 @@ services:
         network_mode: "bridge"
         ports:
           - "8000:8000"
+          
+    theia:
+        restart: always
+        hostname: theiaide
+        container_name: theiaide
+        image: theiaide/theia-full:next
+        environment:
+          TZ: "Asia/Jerusalem"
+        volumes:
+          - /home/dima/docker-mounts:/home/project
+          - /home/dima/platesMigration:/home/project/platesMigration
+        network_mode: "bridge"
+        ports:
+          - "3000:3000"
 
 
     homeassistant:
@@ -95,11 +93,14 @@ services:
         labels:
           com.ouroboros.enable: "false"
         environment:
-          TZ: "Asia/Jerusalem"
+          # TZ: "Asia/Jerusalem"
           USER: ${HA_USER}
           PASS: ${HA_PASS}
         volumes:
           - /home/dima/docker-mounts/ha:/config
+          - /media/dima/RouterHDD/Movies:/media/movies
+          - /etc/localtime:/etc/localtime:ro
+          - /etc/timezone:/etc/timezone:ro
         network_mode: "host"
 
     portainer:
@@ -120,16 +121,18 @@ services:
         restart: always
         hostname: ftp-server
         container_name: ftp-server
-        image: mauler/simple-ftp-server
+        image: stilliard/pure-ftpd
         environment:
           TZ: "Asia/Jerusalem"
-          FTP_USER: ${FTP_USER}
-          FTP_PASS: ${FTP_PASS}
-        mac_address: 00:00:ff:ff:ff:01
+          FTP_USER_NAME: ${FTP_USER}
+          FTP_USER_PASS: ${FTP_PASS}
+          FTP_USER_HOME: "/home/dima/"
         volumes:
-          - /media/dima/RouterHDD/ftp:/ftp-home
+          - /media/dima/RouterHDD/ftp:/home/dima/
+          - /home/dima/docker-mounts/ftpd/passwd:/etc/pure-ftpd/passwd
         ports:
-          - "11021:21"
+          - "21:21"
+          - "30000-30009:30000-30009"
     
 
     nginx: 
@@ -172,11 +175,12 @@ services:
       command: samba.sh -s "all;/mnt/RouterHDD;yes;no;yes;all" 
       volumes:
         - /media/dima/RouterHDD:/mnt/RouterHDD
-      ports:
-        - "139:139"
-        - "445:445"
-        - "137:137/udp"
-        - "138:138/udp"
+      network_mode: "host"
+      # ports:
+      #   - "139:139"
+      #   - "445:445"
+      #   - "137:137/udp"
+      #   - "138:138/udp"
       
     heimdall:
       image: linuxserver/heimdall
@@ -190,6 +194,19 @@ services:
       ports:
         - 880:80
         - 8443:443
+      restart: always
+      
+    organizr:
+      image: linuxserver/organizr
+      container_name: organizr
+      environment:
+        - PUID=1000
+        - PGID=1000
+        - TZ=Asia/Jerusalem
+      volumes:
+        - /home/dima/docker-mounts/organizr:/config
+      ports:
+        - 9983:80
       restart: always
       
     certbot:
@@ -243,8 +260,8 @@ services:
         - /home/dima/docker-mounts/esphome:/config:rw
       network_mode: host
       restart: always
-      ports:
-        - "6052:6052"
+      # ports:
+      #   - "6052:6052"
       
 
     pihole:
@@ -252,11 +269,11 @@ services:
       hostname: pihole
       image: pihole/pihole:latest
       ports:
-        - "53:53/tcp"
-        - "53:53/udp"
-        - "67:67/udp"
-        - "1080:80/tcp"
-        - "10443:443/tcp"
+        - "192.168.1.141:53:53/tcp"
+        - "192.168.1.141:53:53/udp"
+        - "192.168.1.141:67:67/udp"
+        - "0.0.0.0:1080:80/tcp"
+        - "0.0.0.0:10443:443/tcp"
       environment:
         TZ: 'Asia/Jerusalem'
         WEBPASSWORD: ${PIHOLE_PASS}
@@ -288,8 +305,8 @@ services:
         - TZ=Asia/Jerusalem
         - LOG_LEVEL="info"
         - KEYS_PATH="./root"
-      ports:
-        - "5037:5037"
+      # ports:
+      #  - "5037:5037"
         
     broadlinkmanager:
       container_name: broadlinkmanager
@@ -316,8 +333,16 @@ services:
       ports:
         - 8765:8765
       hostname: motioneye
-      restart: always
+      restart: "unless-stopped"
+      # deploy:
+      #   resources:
+      #     reservations:
+      #       devices:
+      #       - count: all
+      #         capabilities: 
+      #           - "gpu"
       volumes:
+       - /dev/dri:/dev/dri
        - /etc/localtime:/etc/localtime:ro
        - /home/dima/docker-mounts/motioneye:/etc/motioneye
        - /home/dima/docker-mounts/motioneye:/var/lib/motioneye
@@ -338,29 +363,92 @@ services:
           - /home/dima/docker-mounts/jellyfin/cache:/cache
           - /media/dima/RouterHDD/Movies:/video
           
-        
-    # glances:
-    #   image: vimagick/glances
-    #   container_name: glances
-    #   volumes:
-    #     - /home/dima/docker-mounts/glances:/etc/glances
-    #     - /var/run/docker.sock:/var/run/docker.sock:ro
-    #   environment:
-    #     - GLANCES_OPT=-w
-    #   network_mode: host
-    #   pid: host
-    #   restart: always
-    
+      
     
     havid-19:
       image: techblog/havid-19
       container_name: havid-19
       restart: always
       environment:
-        - USER_ID=5217038
-        - USER_KEY=${PARENTS_PASS}
+        TZ: "Asia/Jerusalem"
       ports:
         - "6700:6700"
+      volumes:
+        - /home/dima/docker-mounts/havid/:/opt/dockerbot/config
+        
+    # havid-dev:
+    #   image: techblog/havid-19
+    #   container_name: havid-dev
+    #   restart: unless-stopped
+    #   environment:
+    #     TZ: "Asia/Jerusalem"
+    #   ports:
+    #     - "6701:6700"
+    #   volumes:
+    #     - /home/dima/docker-mounts/haviddev/:/opt/dockerbot/config
+    #     - /home/dima/docker-mounts/HAvid-19/workers/Hilan_Health_Statements.py:/opt/dockerbot/Hilan_Health_Statements.py
+    #     - /home/dima/docker-mounts/HAvid-19/workers/Health_Statements.py:/opt/dockerbot/Health_Statements.py
+    #     - /home/dima/docker-mounts/HAvid-19/dockerbot.py:/opt/dockerbot/dockerbot.py
+        
+    mongo:
+      container_name: mongo
+      image: mongo:4.4.1-bionic
+      restart: unless-stopped
+      environment:
+        - MONGO_INITDB_ROOT_USERNAME=${MONGO_USER}
+        - MONGO_INITDB_ROOT_PASSWORD=${MONGO_PASS}
+        - MONGO_INITDB_DATABASE=admin
+      volumes:
+        - /home/dima/docker-mounts/mongo/db:/data/db
+        - /home/dima/docker-mounts/mongo/db/config:/data/configdb
+        - /home/dima/docker-mounts/mongo/docker-entrypoint-initdb.d:/docker-entrypoint-initdb.d
+      ports:
+        - "27017:27017"
+        
+        
+    apachephp:
+      container_name: php
+      image: tutum/apache-php
+      restart: unless-stopped  
+      ports:
+        - "8888:80"
+      volumes:
+        - /home/dima/docker-mounts/php:/app
+        
+    joal:  # http://192.168.1.141:15538/somepath/ui
+      image: anthonyraymond/joal
+      container_name: joal
+      restart: unless-stopped
+      volumes:
+        - /home/dima/docker-mounts/joal:/data
+      ports:
+        - 15538:15538
+      command: ["--joal-conf=/data", "--spring.main.web-environment=true", "--server.port=15538", "--joal.ui.path.prefix=somepath", "--joal.ui.secret-token=somepass"]
+          
+          
+    openvpn:
+      image: myownvpn
+      container_name: openvpn
+      restart: unless-stopped  
+      ports:
+        - "1194:1194/udp"
+      cap_add:
+        - NET_ADMIN  
+      volumes: 
+        - /home/dima/docker-mounts/vpn-data:/etc/openvpn
+      command: myownvpn
       
+    # glances:
+    #   image: nicolargo/glances:dev
+    #   container_name: glances
+    #   volumes:
+    #     - /var/run/docker.sock:/var/run/docker.sock:ro
+    #   environment:
+    #     - GLANCES_OPT=-w
+    #   network_mode: host
+    #   pid: host
+    #   restart: always
+      #http://localhost:61208
+    
 volumes:
   sessions:
