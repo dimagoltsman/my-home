@@ -1,21 +1,28 @@
 version: '3.8'
 services:
 
-    mariadb:
+          
+    mysql:
         restart: always
-        hostname: mariadb
-        container_name: mariadb
-        image: mariadb:latest
+        hostname: mysql
+        container_name: mysql
+        image: mysql
         environment:
-          PUID: 0f
+          PUID: 0
           PGID: 0
           TZ: "Asia/Jerusalem"
           MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
           MYSQL_ROOT_HOST: "%"
+        cap_add:
+          - SYS_NICE 
         ports:
           - "3306:3306"
+          - "33060:33060"
         volumes:
-          - /home/dima/docker-mounts/mariadb:/var/lib/mysql
+          - /home/dima/docker-mounts/mysql/data:/var/lib/mysql
+          - /home/dima/docker-mounts/mysql/etc-mysql/my.cnf:/etc/mysql/my.cnf
+          - /home/dima/docker-mounts/mysql/etc-mysql/conf.d:/etc/mysql/conf.d
+          - /home/dima/docker-mounts/mysql/log/mysql-slow.log:/var/log/mysql-slow.log
   
     mqtt:
         restart: always
@@ -24,8 +31,6 @@ services:
         image: eclipse-mosquitto:latest
         environment:
           TZ: "Asia/Jerusalem"
-          USER: ${MQTT_USER}
-          PASS: ${MQTT_PASS}
         volumes:
           - /home/dima/docker-mounts/mqtt/data:/mosquitto/data
           - /home/dima/docker-mounts/mqtt/config:/mosquitto/config
@@ -46,6 +51,7 @@ services:
           PASS: ${TRANSMISSION_PASS}
         volumes:
           - /media/dima/RouterHDD/Movies:/downloads
+          - /home/dima/transmission-incomplete:/incomplete
           - /home/dima/docker-mounts/transmission:/config
         network_mode: "host"
 
@@ -55,9 +61,11 @@ services:
         container_name: cloud9
         image: linuxserver/cloud9:latest
         environment:
-          PUID: 0
-          PGID: 0
+          PUID: 1000
+          PGID: 1000
           TZ: "Asia/Jerusalem"
+          # USERNAME: ${C9_USER}   #ALREADY SET IN NGINX
+          # PASSWORD: ${C9_PASS}
         volumes:
           - /home/dima/docker-mounts:/code
           - /home/dima/platesMigration:/code/platesMigration
@@ -70,7 +78,7 @@ services:
         restart: always
         hostname: theiaide
         container_name: theiaide
-        image: theiaide/theia-full:next
+        image: elswork/theia
         environment:
           TZ: "Asia/Jerusalem"
         volumes:
@@ -87,9 +95,8 @@ services:
         container_name: Home-Assistant
         image: homeassistant/home-assistant:stable
         depends_on: 
-          - mariadb
+          - mysql
           - mqtt
-          - nginx
         labels:
           com.ouroboros.enable: "false"
         environment:
@@ -107,7 +114,7 @@ services:
         restart: always
         hostname: portainer
         container_name: Portrainer
-        image: portainer/portainer-ce
+        image: portainer/portainer-ce:2.11.1
         environment:
           TZ: "Asia/Jerusalem"
         volumes:
@@ -149,6 +156,14 @@ services:
         - /home/dima/docker-mounts/certbot/www:/var/www/certbot
         - /media/dima/RouterHDD/ftp:/ftp
       network_mode: "host"
+      
+
+    nginx-ui:
+      image: schenkd/nginx-ui:latest
+      ports:
+        - 8282:8080
+      volumes:
+        - /home/dima/docker-mounts/nginx/etc/nginx:/etc/nginx
 
     ouroboros:
       image: pyouroboros/ouroboros
@@ -166,35 +181,23 @@ services:
         - CRON="0 6 * * *"
       restart: always
     
-    samba:
-      image: sixeyed/samba
-      container_name: samba
-      restart: always
-      environment:
-        BRIDGE: php-local
-      command: samba.sh -s "all;/mnt/RouterHDD;yes;no;yes;all" 
-      volumes:
-        - /media/dima/RouterHDD:/mnt/RouterHDD
-      network_mode: "host"
+    # samba:
+    #   image: sixeyed/samba
+    #   container_name: samba
+    #   restart: always
+    #   environment:
+    #     BRIDGE: php-local
+    #   command: samba.sh -s "all;/mnt/RouterHDD;yes;no;yes;all" 
+    #   volumes:
+    #     - /media/dima/RouterHDD:/mnt/RouterHDD
+    #   network_mode: "host"
       # ports:
       #   - "139:139"
       #   - "445:445"
       #   - "137:137/udp"
       #   - "138:138/udp"
       
-    heimdall:
-      image: linuxserver/heimdall
-      container_name: heimdall
-      environment:
-        - PUID=1000
-        - PGID=1000
-        - TZ=Asia/Jerusalem
-      volumes:
-        - /home/dima/docker-mounts/heimdall/config:/config
-      ports:
-        - 880:80
-        - 8443:443
-      restart: always
+
       
     organizr:
       image: linuxserver/organizr
@@ -251,7 +254,7 @@ services:
       network_mode: "bridge"
       restart: always
       volumes:
-      - /home/dima/docker-mounts/gosdm/mbmd.yaml:/etc/mbmd.yaml
+        - /home/dima/docker-mounts/gosdm/mbmd.yaml:/etc/mbmd.yaml
       
     esphome:
       container_name: esphome
@@ -327,25 +330,25 @@ services:
      volumes:
       - /sessions
       
-    motioneye:
-      image: ccrisan/motioneye:master-amd64
-      container_name: motioneye
-      ports:
-        - 8765:8765
-      hostname: motioneye
-      restart: "unless-stopped"
-      # deploy:
-      #   resources:
-      #     reservations:
-      #       devices:
-      #       - count: all
-      #         capabilities: 
-      #           - "gpu"
-      volumes:
-       - /dev/dri:/dev/dri
-       - /etc/localtime:/etc/localtime:ro
-       - /home/dima/docker-mounts/motioneye:/etc/motioneye
-       - /home/dima/docker-mounts/motioneye:/var/lib/motioneye
+    # motioneye:
+    #   image: ccrisan/motioneye:master-amd64
+    #   container_name: motioneye
+    #   ports:
+    #     - 8765:8765
+    #   hostname: motioneye
+    #   restart: "unless-stopped"
+    #   # deploy:
+    #   #   resources:
+    #   #     reservations:
+    #   #       devices:
+    #   #       - count: all
+    #   #         capabilities: 
+    #   #           - "gpu"
+    #   volumes:
+    #    - /dev/dri:/dev/dri
+    #    - /etc/localtime:/etc/localtime:ro
+    #    - /home/dima/docker-mounts/motioneye:/etc/motioneye
+    #    - /home/dima/docker-mounts/motioneye:/var/lib/motioneye
     
     jellyfin:
         hostname: jellyfin
@@ -363,33 +366,23 @@ services:
           - /home/dima/docker-mounts/jellyfin/cache:/cache
           - /media/dima/RouterHDD/Movies:/video
           
-      
-    
-    havid-19:
-      image: techblog/havid-19
-      container_name: havid-19
-      restart: always
+        
+    plex:
+      image: lscr.io/linuxserver/plex:latest
+      container_name: plex
+      network_mode: host
       environment:
-        TZ: "Asia/Jerusalem"
-      ports:
-        - "6700:6700"
+        - PUID=1000
+        - PGID=1000
+        - VERSION=docker
+        - PLEX_CLAIM=claim-gLJUr6xy33rdakr-4_X3
       volumes:
-        - /home/dima/docker-mounts/havid/:/opt/dockerbot/config
-        
-    # havid-dev:
-    #   image: techblog/havid-19
-    #   container_name: havid-dev
-    #   restart: unless-stopped
-    #   environment:
-    #     TZ: "Asia/Jerusalem"
-    #   ports:
-    #     - "6701:6700"
-    #   volumes:
-    #     - /home/dima/docker-mounts/haviddev/:/opt/dockerbot/config
-    #     - /home/dima/docker-mounts/HAvid-19/workers/Hilan_Health_Statements.py:/opt/dockerbot/Hilan_Health_Statements.py
-    #     - /home/dima/docker-mounts/HAvid-19/workers/Health_Statements.py:/opt/dockerbot/Health_Statements.py
-    #     - /home/dima/docker-mounts/HAvid-19/dockerbot.py:/opt/dockerbot/dockerbot.py
-        
+        - /home/dima/docker-mounts/plex/config:/config
+        - /media/dima/RouterHDD/Movies:/movies
+      devices:
+        - /dev/dri:/dev/dri
+      restart: unless-stopped
+      
     mongo:
       container_name: mongo
       image: mongo:4.4.1-bionic
@@ -412,43 +405,141 @@ services:
       restart: unless-stopped  
       ports:
         - "8888:80"
+      environment:
+        - ALLOW_OVERRIDE=true
       volumes:
         - /home/dima/docker-mounts/php:/app
         
-    joal:  # http://192.168.1.141:15538/somepath/ui
+    joal:  # http://192.168.1.141:15538/SECRET_OBFUSCATION_PATH/ui/#/
       image: anthonyraymond/joal
       container_name: joal
       restart: unless-stopped
+      environment:
+        - joal.ui.path.prefix=SECRET_OBFUSCATION_PATH
+        - joal.ui.secret-token=SECRET_TOKEN
+        - spring.main.web-environment=true
+        - server.port=15538
       volumes:
         - /home/dima/docker-mounts/joal:/data
       ports:
         - 15538:15538
-      command: ["--joal-conf=/data", "--spring.main.web-environment=true", "--server.port=15538", "--joal.ui.path.prefix=somepath", "--joal.ui.secret-token=somepass"]
+      command: ["--joal-conf=/data"]
           
           
     openvpn:
-      image: myownvpn
-      container_name: openvpn
-      restart: unless-stopped  
-      ports:
-        - "1194:1194/udp"
       cap_add:
-        - NET_ADMIN  
-      volumes: 
+        - NET_ADMIN
+      command:
+        - ovpn_run
+      container_name: openvpn
+      environment:
+        - PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+        - OPENVPN=/etc/openvpn
+        - EASYRSA=/usr/share/easy-rsa
+        - EASYRSA_CRL_DAYS=3650
+        - EASYRSA_PKI=/etc/openvpn/pki
+      image: myownvpn
+      ipc: private
+      logging:
+        driver: json-file
+        options: {}
+      ports:
+        - 1194:1194/udp
+      restart: unless-stopped
+      volumes:
         - /home/dima/docker-mounts/vpn-data:/etc/openvpn
-      command: myownvpn
-      
-    # glances:
-    #   image: nicolargo/glances:dev
-    #   container_name: glances
-    #   volumes:
-    #     - /var/run/docker.sock:/var/run/docker.sock:ro
-    #   environment:
-    #     - GLANCES_OPT=-w
-    #   network_mode: host
-    #   pid: host
-    #   restart: always
-      #http://localhost:61208
     
+    decompose:
+      image: techblog/decompose
+      container_name: decompose
+      restart: always
+      volumes:
+        - /var/run/docker.sock:/var/run/docker.sock
+      ports:
+        - "9090:8080"   
+
+    filebrowser:
+      container_name: filebrowser
+      image: hurlenko/filebrowser
+      ports:
+        - 12123:8080
+      volumes:
+        - /media/dima/RouterHDD/:/data
+        - /home/dima/docker-mounts/filebrowser:/config
+      environment:
+        - FB_BASEURL=/filebrowser
+      restart: always
+
+    redalert:
+      image: techblog/redalert
+      container_name: redalert
+      restart: always
+      environment:
+        - MQTT_HOST=192.168.1.141
+        - MQTT_USER=${MQTT_USER}
+        - MQTT_PASS=${MQTT_PASS}
+        - MQTT_PORT=1883
+        - DEBUG_MODE=False
+        - NOTIFIERS=${TELEGRAM_NOTIF}
+        - REGION=*
+        - INCLUDE_TEST_ALERTS=False
+      restart: unless-stopped
+      
+    # redalert_dev:
+    #   build:
+    #     context: ../Redalert
+    #     dockerfile: Dockerfile
+    #   container_name: redalert_dev
+    #   restart: always
+    #   environment:
+    #     - MQTT_HOST=192.168.1.141
+    #     - MQTT_USER=${MQTT_USER}
+    #     - MQTT_PASS=${MQTT_PASS}
+    #     - MQTT_PORT=1883
+    #     - DEBUG_MODE=True
+    #     - NOTIFIERS=${TELEGRAM_NOTIF}
+    #     - REGION=*
+    #     - INCLUDE_TEST_ALERTS=False
+    #   restart: unless-stopped
+      
+    rtmp:
+      image: alqutami/rtmp-hls
+      container_name: rtmp
+      restart: unless-stopped
+      ports:
+        - 1935:1935
+        - 1936:8080
+        
+    duplicati:
+      image: lscr.io/linuxserver/duplicati
+      container_name: duplicati
+      environment:
+        - PUID=0
+        - PGID=0
+        - TZ=Europe/London
+        - CLI_ARGS= #optional
+      volumes:
+        - /home/dima/docker-mounts/duplicati:/config
+      #  - </path/to/backups>:/backups
+        -  /home/dima/docker-mounts:/source
+      ports:
+        - 8200:8200
+      restart: unless-stopped
+        
+        
+    puppeteer:
+      build:
+        context: ../awslambda/puppeteer
+        dockerfile: ./Dockerfile
+      container_name: puppeteer
+      hostname: puppeteer.local
+      restart: unless-stopped
+      # volumes:
+      #   - ../awslambda/puppeteer/app:/var/task
+      ports:
+        - 1904:8080
+      environment:
+        APP_ENV: local
+
 volumes:
   sessions:
