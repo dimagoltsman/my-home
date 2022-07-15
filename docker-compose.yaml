@@ -114,7 +114,7 @@ services:
         restart: always
         hostname: portainer
         container_name: Portrainer
-        image: portainer/portainer-ce:2.11.1
+        image: portainer/portainer-ce
         environment:
           TZ: "Asia/Jerusalem"
         volumes:
@@ -410,13 +410,13 @@ services:
       volumes:
         - /home/dima/docker-mounts/php:/app
         
-    joal:  # http://192.168.1.141:15538/SECRET_OBFUSCATION_PATH/ui/#/
+    joal: 
       image: anthonyraymond/joal
       container_name: joal
       restart: unless-stopped
       environment:
-        - joal.ui.path.prefix=SECRET_OBFUSCATION_PATH
-        - joal.ui.secret-token=SECRET_TOKEN
+        - joal.ui.path.prefix=${PREF}
+        - joal.ui.secret-token=${JOAL_SEC}
         - spring.main.web-environment=true
         - server.port=15538
       volumes:
@@ -485,22 +485,22 @@ services:
         - INCLUDE_TEST_ALERTS=False
       restart: unless-stopped
       
-    # redalert_dev:
-    #   build:
-    #     context: ../Redalert
-    #     dockerfile: Dockerfile
-    #   container_name: redalert_dev
-    #   restart: always
-    #   environment:
-    #     - MQTT_HOST=192.168.1.141
-    #     - MQTT_USER=${MQTT_USER}
-    #     - MQTT_PASS=${MQTT_PASS}
-    #     - MQTT_PORT=1883
-    #     - DEBUG_MODE=True
-    #     - NOTIFIERS=${TELEGRAM_NOTIF}
-    #     - REGION=*
-    #     - INCLUDE_TEST_ALERTS=False
-    #   restart: unless-stopped
+    redalert_dev:
+      build:
+        context: ../Redalert
+        dockerfile: Dockerfile
+      container_name: redalert_dev
+      restart: always
+      environment:
+        - MQTT_HOST=192.168.1.141
+        - MQTT_USER=${MQTT_USER}
+        - MQTT_PASS=${MQTT_PASS}
+        - MQTT_PORT=1883
+        - DEBUG_MODE=True
+        - NOTIFIERS=${TELEGRAM_NOTIF}
+        - REGION=*
+        - INCLUDE_TEST_ALERTS=False
+      restart: unless-stopped
       
     rtmp:
       image: alqutami/rtmp-hls
@@ -526,20 +526,7 @@ services:
         - 8200:8200
       restart: unless-stopped
         
-        
-    puppeteer:
-      build:
-        context: ../awslambda/puppeteer
-        dockerfile: ./Dockerfile
-      container_name: puppeteer
-      hostname: puppeteer.local
-      restart: unless-stopped
-      # volumes:
-      #   - ../awslambda/puppeteer/app:/var/task
-      ports:
-        - 1904:8080
-      environment:
-        APP_ENV: local
+
 
 volumes:
   sessions:
